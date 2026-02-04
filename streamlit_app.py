@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""
-═══════════════════════════════════════════════════════════════════════════════
-φ-FIELD ADVANCED KNOWLEDGE MINER - STREAMLIT EDITION v12.0
-═══════════════════════════════════════════════════════════════════════════════
-Interactive Streamlit dashboard for unified knowledge mining and φ-resonance detection
-
-AUTHOR: Peter Braun
-DATE: 2025-02-04
-═══════════════════════════════════════════════════════════════════════════════
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -476,14 +465,3 @@ st.markdown(f"""
     <p>φ = {PHI:.10f}</p>
 </div>
 """, unsafe_allow_html=True)
-```
-
----
-
-## **requirements.txt**
-```
-streamlit>=1.28.0
-pandas>=2.0.0
-numpy>=1.24.0
-plotly>=5.17.0
-networkx>=3.1
