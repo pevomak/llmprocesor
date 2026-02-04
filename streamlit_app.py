@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
 ═══════════════════════════════════════════════════════════════════════════════
-UNIFIED φ-FIELD PROCESSOR — STREAMLIT DASHBOARD v12.0
+φ-FIELD ADVANCED KNOWLEDGE MINER - STREAMLIT EDITION v12.0
 ═══════════════════════════════════════════════════════════════════════════════
-Interactive visualization and analysis dashboard integrating:
-- SNLQC v11.0 (Quantum decoherence analysis)
-- LLM v3.0 (Conversation mining)
-- IGS/IRGS (Theoretical frameworks)
+Interactive Streamlit dashboard for unified knowledge mining and φ-resonance detection
 
-AUTHOR: Peter Braun + Integration Team
+AUTHOR: Peter Braun
 DATE: 2025-02-04
 ═══════════════════════════════════════════════════════════════════════════════
 """
@@ -18,674 +15,475 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
+import networkx as nx
 import json
-from pathlib import Path
-from datetime import datetime
-import hashlib
 import math
+import hashlib
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass, field, asdict
+from collections import Counter
+from datetime import datetime
 
-# Page configuration
+# ═══════════════════════════════════════════════════════════════════════════
+# CONSTANTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+PHI = (1 + math.sqrt(5)) / 2
+SNL_UNIVERSAL_K = 1.05e15
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PAGE CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
+
 st.set_page_config(
-    page_title="Unified φ-Field Processor",
+    page_title="φ-Field Knowledge Miner",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Constants
-PHI = (1 + math.sqrt(5)) / 2
-HBAR = 1.054571817e-34
-KB = 1.380649e-23
-SNL_UNIVERSAL_K = 1.05e15
-
 # Custom CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
+        font-size: 3rem;
         font-weight: bold;
-        color: #1f77b4;
+        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 1rem;
     }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .phi-constant {
+        text-align: center;
+        font-size: 1.5rem;
+        color: #ffd700;
         padding: 1rem;
-        border-radius: 0.5rem;
-        color: white;
-        margin: 0.5rem 0;
+        background: rgba(255,215,0,0.1);
+        border-radius: 10px;
+        margin: 1rem 0;
     }
-    .confidence-high { color: #00ff00; font-weight: bold; }
-    .confidence-medium { color: #ffaa00; font-weight: bold; }
-    .confidence-low { color: #ff0000; font-weight: bold; }
-    .phi-highlight { color: #ffd700; font-weight: bold; }
+    .entity-card {
+        background: rgba(255,215,0,0.05);
+        border-left: 4px solid #ffd700;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border-radius: 5px;
+    }
+    .stMetric {
+        background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+        padding: 1rem;
+        border-radius: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SIDEBAR CONFIGURATION
+# DATA STRUCTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
-st.sidebar.title("⚙️ Configuration")
-
-analysis_mode = st.sidebar.selectbox(
-    "Analysis Mode",
-    ["Quantum Layer", "Information Layer", "Theoretical Layer", "Unified Integration"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### Quantum Parameters")
-
-n_qubits = st.sidebar.slider("Number of Qubits", 10, 500, 128)
-platform = st.sidebar.selectbox(
-    "Quantum Platform",
-    ["All Platforms", "Superconducting", "Trapped Ions", "NV Centers", "Quantum Dots"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### φ-Field Settings")
-
-phi_threshold = st.sidebar.slider("φ-Resonance Threshold", 0.0, 1.0, 0.7, 0.05)
-enable_validation = st.sidebar.checkbox("Enable Empirical Validation", value=True)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"""
-### Constants
-- **φ (Golden Ratio):** {PHI:.10f}
-- **K (Universal Const):** {SNL_UNIVERSAL_K:.2e} s·rad²·m⁻³
-- **ℏ (Planck):** {HBAR:.3e} J·s
-- **k_B (Boltzmann):** {KB:.3e} J/K
-""")
+@dataclass
+class MiningEntity:
+    id: str
+    type: str
+    content: str
+    source: str
+    timestamp: str
+    confidence: float
+    phi_score: float = 0.0
+    metadata: Dict = field(default_factory=dict)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# DATA GENERATION FUNCTIONS
+# ANALYSIS ENGINES
 # ═══════════════════════════════════════════════════════════════════════════
 
-@st.cache_data
-def generate_quantum_data(n_qubits, selected_platform):
-    """Generate synthetic quantum data"""
-    platforms = ["Superconducting", "Trapped Ions", "NV Centers", "Quantum Dots"]
-    platform_params = {
-        "Superconducting": (25.0, 100, 0.92),
-        "Trapped Ions": (150.0, 1000, 0.98),
-        "NV Centers": (80.0, 500, 0.95),
-        "Quantum Dots": (15.0, 150, 0.89)
+class EntropyAnalyzer:
+    @staticmethod
+    def calculate(text: str) -> float:
+        if not text:
+            return 0.0
+        counts = Counter(text)
+        length = len(text)
+        entropy = -sum((c / length) * math.log2(c / length) for c in counts.values())
+        max_entropy = math.log2(min(256, len(set(text))))
+        return entropy / max_entropy if max_entropy > 0 else 0.0
+    
+    @staticmethod
+    def is_signal(text: str, min_entropy: float = 0.25) -> bool:
+        return len(text) >= 20 and EntropyAnalyzer.calculate(text) > min_entropy
+
+class PatternDetector:
+    PATTERNS = {
+        'equation': re.compile(
+            r'\$\$([^\$]+)\$\$|\$([^\$]+)\$|([A-Z][a-z]*(?:_[a-z]+)*)\s*=\s*([^=\n]{5,100})',
+            re.DOTALL
+        ),
+        'phi_ref': re.compile(r'φ|phi|golden\s+ratio|1\.618|fibonacci', re.IGNORECASE),
+        'evidence': re.compile(r'r\s*=\s*(-?0\.\d+)|p\s*[<>=]\s*(0\.\d+)', re.IGNORECASE),
+        'prediction': re.compile(r'predict(?:s|ion)?[\s:]+([^.\n]{10,200})', re.IGNORECASE)
     }
     
-    data = []
-    np.random.seed(42)
+    @staticmethod
+    def extract_equations(text: str) -> List[str]:
+        equations = []
+        for match in PatternDetector.PATTERNS['equation'].finditer(text):
+            eq = next((g for g in match.groups() if g), None)
+            if eq and len(eq.strip()) > 3:
+                equations.append(eq.strip())
+        return equations
     
-    for i in range(n_qubits):
-        if selected_platform == "All Platforms":
-            plat = platforms[i % len(platforms)]
+    @staticmethod
+    def detect_phi_scaling(text: str) -> int:
+        return len(PatternDetector.PATTERNS['phi_ref'].findall(text))
+
+class PhiScoreCalculator:
+    @staticmethod
+    def calculate_phi_score(entropy: float, frequency: int, depth: int) -> float:
+        return (entropy * math.log1p(frequency)) * (0.9 ** depth) / PHI
+    
+    @staticmethod
+    def calculate_phi_resonance(score1: float, score2: float) -> Tuple[float, float, str]:
+        if score2 == 0:
+            return 0.0, 1.0, "NONE"
+        ratio = score1 / score2
+        deviation = abs(ratio - PHI) / PHI
+        
+        if deviation < 0.1:
+            strength = "STRONG"
+        elif deviation < 0.3:
+            strength = "MODERATE"
+        elif deviation < 0.5:
+            strength = "WEAK"
         else:
-            plat = selected_platform
-        
-        t2_base, depth_base, fid_base = platform_params[plat]
-        
-        # Add variance
-        t2_us = t2_base * (1.0 + np.random.normal(0, 0.1))
-        depth = int(depth_base * (1.0 + np.random.normal(0, 0.15)))
-        
-        # Calculate metrics
-        cone = math.exp(-0.5 * 2)
-        betti4 = np.random.rand() * 6.0
-        
-        T2 = t2_us * 1e-6
-        t_total = depth * 20e-9
-        fidelity = math.exp(-t_total / T2) * math.exp(-0.001 * depth * (PHI ** -2))
-        
-        snr_db = 10 * math.log10(fidelity / (1 - fidelity + 1e-12))
-        
-        # φ-score
-        entropy = betti4
-        phi_score = (entropy * math.log1p(1)) * (0.9 ** 0) / PHI
-        
-        # SNL and validation
-        snl = betti4 * 1e14
-        product = t2_us * 1e-6 * snl
-        deviation = abs(product - SNL_UNIVERSAL_K) / SNL_UNIVERSAL_K
-        
-        # Tunneling
-        barrier = KB * 0.015 * (t_total / T2)
-        tunneling_prob = math.exp(-abs(barrier) / (KB * 0.015))
-        
-        data.append({
-            'qubit_id': f'Q{i:03d}',
-            'platform': plat,
-            't2_us': t2_us,
-            'depth': depth,
-            'fidelity': fidelity,
-            'snr_db': snr_db,
-            'phi_score': phi_score,
-            'betti4': betti4,
-            'cone_factor': cone,
-            'snl': snl,
-            't2_snl_product': product,
-            'snl_deviation': deviation,
-            'tunneling_prob': tunneling_prob,
-            'barrier_eV': barrier / 1.602e-19
-        })
-    
-    return pd.DataFrame(data)
+            strength = "NONE"
+        return ratio, deviation, strength
 
-@st.cache_data
-def generate_information_data(n_concepts=100):
-    """Generate synthetic information layer data"""
-    np.random.seed(42)
-    
-    data = []
-    for i in range(n_concepts):
-        entropy = np.random.rand()
-        frequency = int(np.random.exponential(5) + 1)
-        depth = np.random.randint(0, 5)
-        
-        phi_score = (entropy * math.log1p(frequency)) * (0.9 ** depth) / PHI
-        
-        quality = min(1.0, (
-            0.4 * entropy +
-            0.3 * min(1.0, frequency / 10) +
-            0.3 * (1.0 - depth / 5)
-        ))
-        
-        data.append({
-            'concept_id': f'C{i:03d}',
-            'entropy': entropy,
-            'frequency': frequency,
-            'depth': depth,
-            'phi_score': phi_score,
-            'quality': quality,
-            'type': np.random.choice(['equation', 'definition', 'evidence', 'prediction'])
-        })
-    
-    return pd.DataFrame(data)
+# ═══════════════════════════════════════════════════════════════════════════
+# SESSION STATE
+# ═══════════════════════════════════════════════════════════════════════════
 
-@st.cache_data
-def generate_theoretical_data(n_theories=20):
-    """Generate synthetic theoretical constructs"""
-    np.random.seed(42)
-    
-    theories = [
-        ("T₂·SNL = K", 0.92, "VALIDATED"),
-        ("ΔS = k_B ln(φ) Δd", 0.92, "VALIDATED"),
-        ("F = -∇S", 0.90, "VALIDATED"),
-        ("R_obs = (∏ R_i)^(1/n)", 0.95, "VALIDATED"),
-        ("Q = -(ℏ²/2m)(∇²R/R)", 0.88, "UNDER_TEST"),
-        ("φ^4 ≈ 6.85", 0.85, "UNDER_TEST"),
-        ("Bell φ-scaling", 0.90, "UNDER_TEST"),
-        ("φ-π duality", 0.88, "UNDER_TEST"),
-    ]
-    
-    data = []
-    for i, (formula, conf, status) in enumerate(theories):
-        predictions = int(np.random.poisson(3))
-        
-        data.append({
-            'theory_id': f'T{i:02d}',
-            'formula': formula,
-            'confidence': conf,
-            'status': status,
-            'predictions': predictions,
-            'validations': int(predictions * conf)
-        })
-    
-    return pd.DataFrame(data)
+if 'entities' not in st.session_state:
+    st.session_state.entities = {}
+if 'phi_resonances' not in st.session_state:
+    st.session_state.phi_resonances = []
+if 'stats' not in st.session_state:
+    st.session_state.stats = {
+        'files_processed': 0,
+        'entities_mined': 0,
+        'phi_resonances': 0,
+        'equations_found': 0,
+        'predictions_found': 0
+    }
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN HEADER
 # ═══════════════════════════════════════════════════════════════════════════
 
-st.markdown('<div class="main-header">🔬 Unified φ-Field Processor v12.0</div>', unsafe_allow_html=True)
-st.markdown("### Quantum + Information + Theoretical Integration Dashboard")
+st.markdown('<div class="main-header">🔬 φ-Field Advanced Knowledge Miner</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="phi-constant">φ = {PHI:.10f} | K = {SNL_UNIVERSAL_K:.2e} s·rad²·m⁻³</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MODE-SPECIFIC CONTENT
+# SIDEBAR
 # ═══════════════════════════════════════════════════════════════════════════
 
-if analysis_mode == "Quantum Layer":
-    st.header("⚛️ Quantum Decoherence Analysis (SNLQC v11.0)")
+with st.sidebar:
+    st.title("⚙️ Mining Configuration")
     
-    # Generate data
-    df_quantum = generate_quantum_data(n_qubits, platform)
-    
-    # Metrics row
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Qubits", len(df_quantum))
-    with col2:
-        st.metric("Mean Fidelity", f"{df_quantum['fidelity'].mean():.4f}")
-    with col3:
-        valid_snl = (df_quantum['snl_deviation'] <= 0.15).sum()
-        st.metric("SNL Validated", f"{valid_snl}/{len(df_quantum)}")
-    with col4:
-        st.metric("Mean φ-Score", f"{df_quantum['phi_score'].mean():.4f}")
-    
-    # Platform comparison
-    st.subheader("Platform Performance Comparison")
-    
-    fig_platform = px.box(
-        df_quantum, 
-        x='platform', 
-        y='fidelity',
-        color='platform',
-        title='Fidelity Distribution by Platform'
+    st.markdown("### Upload Data")
+    uploaded_files = st.file_uploader(
+        "Upload JSON/TXT files",
+        type=['json', 'txt', 'md'],
+        accept_multiple_files=True
     )
-    fig_platform.update_layout(showlegend=False, height=400)
-    st.plotly_chart(fig_platform, use_container_width=True)
     
-    # Universal scaling law validation
-    st.subheader("Universal Scaling Law: T₂ · SNL = K")
+    st.markdown("---")
+    st.markdown("### Detection Parameters")
     
-    col1, col2 = st.columns(2)
+    phi_threshold = st.slider("φ-Resonance Threshold", 0.0, 1.0, 0.7, 0.05)
+    entropy_min = st.slider("Minimum Entropy", 0.0, 1.0, 0.25, 0.05)
+    max_display = st.slider("Max Entities Display", 10, 500, 100, 10)
     
-    with col1:
-        fig_scatter = px.scatter(
-            df_quantum,
-            x='t2_us',
-            y='snl',
-            color='platform',
-            size='phi_score',
-            hover_data=['qubit_id', 'fidelity'],
-            title='T₂ vs SNL Relationship',
-            log_x=True,
-            log_y=True
-        )
-        
-        # Add constant line
-        t2_range = np.logspace(np.log10(df_quantum['t2_us'].min()), 
-                               np.log10(df_quantum['t2_us'].max()), 100)
-        snl_line = SNL_UNIVERSAL_K / (t2_range * 1e-6)
-        
-        fig_scatter.add_trace(
-            go.Scatter(
-                x=t2_range,
-                y=snl_line,
-                mode='lines',
-                name=f'K = {SNL_UNIVERSAL_K:.2e}',
-                line=dict(color='red', dash='dash')
-            )
-        )
-        
-        st.plotly_chart(fig_scatter, use_container_width=True)
+    st.markdown("---")
+    st.markdown("### Pattern Detection")
     
-    with col2:
-        fig_deviation = px.histogram(
-            df_quantum,
-            x='snl_deviation',
-            nbins=30,
-            title='SNL Deviation Distribution',
-            color_discrete_sequence=['#636EFA']
-        )
-        fig_deviation.add_vline(x=0.15, line_dash="dash", line_color="red", 
-                               annotation_text="15% Threshold")
-        st.plotly_chart(fig_deviation, use_container_width=True)
+    enable_equations = st.checkbox("Extract Equations", value=True)
+    enable_phi = st.checkbox("Detect φ-Scaling", value=True)
+    enable_predictions = st.checkbox("Extract Predictions", value=True)
     
-    # φ-Score distribution
-    st.subheader("φ-Weighted Performance Metrics")
+    st.markdown("---")
     
-    fig_phi = px.scatter(
-        df_quantum,
-        x='fidelity',
-        y='phi_score',
-        color='platform',
-        size='snr_db',
-        hover_data=['qubit_id', 't2_us', 'depth'],
-        title='Fidelity vs φ-Score'
-    )
-    st.plotly_chart(fig_phi, use_container_width=True)
+    if st.button("🔍 Start Mining", type="primary"):
+        if uploaded_files:
+            progress_bar = st.progress(0)
+            status = st.empty()
+            
+            for idx, file in enumerate(files):
+                status.text(f"Processing: {file.name}")
+                
+                try:
+                    content = file.read().decode('utf-8')
+                    
+                    entropy = EntropyAnalyzer.calculate(content)
+                    
+                    if EntropyAnalyzer.is_signal(content, entropy_min):
+                        phi_count = PatternDetector.detect_phi_scaling(content) if enable_phi else 0
+                        frequency = content.count(' ') + 1
+                        phi_score = PhiScoreCalculator.calculate_phi_score(entropy, frequency, 0)
+                        confidence = min(1.0, entropy + 0.1 * phi_count)
+                        
+                        equations = PatternDetector.extract_equations(content) if enable_equations else []
+                        st.session_state.stats['equations_found'] += len(equations)
+                        
+                        entity_id = hashlib.md5((file.name + content[:100]).encode()).hexdigest()[:12]
+                        
+                        entity = MiningEntity(
+                            id=entity_id,
+                            type='document',
+                            content=content[:1000],
+                            source=file.name,
+                            timestamp=datetime.now().isoformat(),
+                            confidence=confidence,
+                            phi_score=phi_score,
+                            metadata={
+                                'entropy': entropy,
+                                'phi_references': phi_count,
+                                'equations': equations,
+                                'length': len(content)
+                            }
+                        )
+                        
+                        st.session_state.entities[entity_id] = entity
+                        st.session_state.stats['entities_mined'] += 1
+                    
+                    st.session_state.stats['files_processed'] += 1
+                    
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                
+                progress_bar.progress((idx + 1) / len(uploaded_files))
+            
+            # Detect resonances
+            entities = list(st.session_state.entities.values())
+            for i in range(len(entities)):
+                for j in range(i+1, min(i+50, len(entities))):
+                    e1, e2 = entities[i], entities[j]
+                    
+                    if e1.phi_score > 0 and e2.phi_score > 0:
+                        ratio, deviation, strength = PhiScoreCalculator.calculate_phi_resonance(
+                            e1.phi_score, e2.phi_score
+                        )
+                        
+                        if strength in ['STRONG', 'MODERATE']:
+                            st.session_state.phi_resonances.append({
+                                'entity1': e1.id,
+                                'entity2': e2.id,
+                                'ratio': ratio,
+                                'deviation': deviation,
+                                'strength': strength
+                            })
+                            st.session_state.stats['phi_resonances'] += 1
+            
+            status.text("✅ Complete!")
+            progress_bar.empty()
+            st.success(f"Extracted {st.session_state.stats['entities_mined']} entities!")
+        else:
+            st.warning("Upload files first!")
     
-    # Data table
-    st.subheader("Qubit Data Table")
-    st.dataframe(
-        df_quantum[['qubit_id', 'platform', 'fidelity', 'phi_score', 
-                   't2_us', 'snr_db', 'tunneling_prob']].head(20),
-        use_container_width=True
-    )
+    if st.button("🔄 Clear All"):
+        st.session_state.entities = {}
+        st.session_state.phi_resonances = []
+        st.session_state.stats = {k: 0 for k in st.session_state.stats}
+        st.rerun()
 
-elif analysis_mode == "Information Layer":
-    st.header("📊 Information Extraction & UKA Mining (LLM v3.0)")
-    
-    # Generate data
-    df_info = generate_information_data()
+# ═══════════════════════════════════════════════════════════════════════════
+# MAIN DASHBOARD
+# ═══════════════════════════════════════════════════════════════════════════
+
+if st.session_state.entities:
     
     # Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Concepts", len(df_info))
-    with col2:
-        high_quality = (df_info['quality'] >= 0.7).sum()
-        st.metric("High Quality", f"{high_quality}/{len(df_info)}")
-    with col3:
-        st.metric("Mean φ-Score", f"{df_info['phi_score'].mean():.4f}")
-    with col4:
-        st.metric("Mean Entropy", f"{df_info['entropy'].mean():.4f}")
-    
-    # Concept type distribution
-    st.subheader("Concept Type Distribution")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        type_counts = df_info['type'].value_counts()
-        fig_pie = px.pie(
-            values=type_counts.values,
-            names=type_counts.index,
-            title='Concept Types'
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
-    
-    with col2:
-        fig_quality = px.box(
-            df_info,
-            x='type',
-            y='quality',
-            color='type',
-            title='Quality by Concept Type'
-        )
-        fig_quality.update_layout(showlegend=False)
-        st.plotly_chart(fig_quality, use_container_width=True)
-    
-    # φ-Score analysis
-    st.subheader("φ-Weighted Hierarchical Scoring")
-    
-    fig_scatter = px.scatter(
-        df_info,
-        x='frequency',
-        y='phi_score',
-        color='depth',
-        size='entropy',
-        hover_data=['concept_id', 'type', 'quality'],
-        title='Frequency vs φ-Score (colored by hierarchy depth)',
-        log_x=True
-    )
-    st.plotly_chart(fig_scatter, use_container_width=True)
-    
-    # Entropy distribution
-    st.subheader("Information Entropy Distribution")
-    
-    fig_hist = px.histogram(
-        df_info,
-        x='entropy',
-        nbins=30,
-        color='type',
-        title='Entropy Distribution by Type',
-        marginal='box'
-    )
-    st.plotly_chart(fig_hist, use_container_width=True)
-    
-    # Top concepts by φ-score
-    st.subheader("Top Concepts by φ-Score")
-    
-    top_concepts = df_info.nlargest(10, 'phi_score')
-    fig_bar = px.bar(
-        top_concepts,
-        x='concept_id',
-        y='phi_score',
-        color='type',
-        title='Top 10 Concepts'
-    )
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-elif analysis_mode == "Theoretical Layer":
-    st.header("🧠 Theoretical Frameworks & Empirical Validation (IGS/IRGS)")
-    
-    # Generate data
-    df_theory = generate_theoretical_data()
-    
-    # Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Theories", len(df_theory))
-    with col2:
-        validated = (df_theory['status'] == 'VALIDATED').sum()
-        st.metric("Validated", validated)
-    with col3:
-        st.metric("Mean Confidence", f"{df_theory['confidence'].mean():.2f}")
-    with col4:
-        st.metric("Total Predictions", df_theory['predictions'].sum())
-    
-    # Status distribution
-    st.subheader("Theory Status Distribution")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        status_counts = df_theory['status'].value_counts()
-        fig_pie = px.pie(
-            values=status_counts.values,
-            names=status_counts.index,
-            title='Theory Status'
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
-    
-    with col2:
-        fig_confidence = px.bar(
-            df_theory.sort_values('confidence', ascending=False),
-            x='theory_id',
-            y='confidence',
-            color='status',
-            title='Confidence by Theory',
-            hover_data=['formula']
-        )
-        st.plotly_chart(fig_confidence, use_container_width=True)
-    
-    # Empirical validation progress
-    st.subheader("Empirical Validation Progress")
-    
-    fig_validation = px.scatter(
-        df_theory,
-        x='predictions',
-        y='validations',
-        color='status',
-        size='confidence',
-        hover_data=['formula'],
-        title='Predictions vs Validations'
-    )
-    
-    # Add diagonal line (perfect validation)
-    max_pred = df_theory['predictions'].max()
-    fig_validation.add_trace(
-        go.Scatter(
-            x=[0, max_pred],
-            y=[0, max_pred],
-            mode='lines',
-            name='Perfect Validation',
-            line=dict(color='red', dash='dash')
-        )
-    )
-    
-    st.plotly_chart(fig_validation, use_container_width=True)
-    
-    # Theory details
-    st.subheader("Theory Details")
-    
-    for _, theory in df_theory.iterrows():
-        with st.expander(f"{theory['theory_id']}: {theory['formula']}"):
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                conf_class = ("confidence-high" if theory['confidence'] >= 0.9 
-                            else "confidence-medium" if theory['confidence'] >= 0.7 
-                            else "confidence-low")
-                st.markdown(f"**Confidence:** <span class='{conf_class}'>{theory['confidence']:.2f}</span>", 
-                          unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"**Status:** {theory['status']}")
-            
-            with col3:
-                st.markdown(f"**Validations:** {theory['validations']}/{theory['predictions']}")
-
-else:  # Unified Integration
-    st.header("🌐 Unified Cross-Layer Integration")
-    
-    # Generate all data
-    df_quantum = generate_quantum_data(n_qubits, platform)
-    df_info = generate_information_data()
-    df_theory = generate_theoretical_data()
-    
-    # Overall metrics
-    st.subheader("System-Wide Metrics")
-    
     col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
-        st.metric("Quantum Entities", len(df_quantum))
+        st.metric("📁 Files", st.session_state.stats['files_processed'])
     with col2:
-        st.metric("Info Entities", len(df_info))
+        st.metric("📦 Entities", st.session_state.stats['entities_mined'])
     with col3:
-        st.metric("Theories", len(df_theory))
+        st.metric("✨ φ-Resonances", st.session_state.stats['phi_resonances'])
     with col4:
-        validated_theories = (df_theory['status'] == 'VALIDATED').sum()
-        st.metric("Validated Theories", validated_theories)
+        st.metric("📐 Equations", st.session_state.stats['equations_found'])
     with col5:
-        mean_phi_q = df_quantum['phi_score'].mean()
-        mean_phi_i = df_info['phi_score'].mean()
-        mean_phi = (mean_phi_q + mean_phi_i) / 2
-        st.metric("System φ-Score", f"{mean_phi:.4f}")
+        avg_phi = sum(e.phi_score for e in st.session_state.entities.values()) / len(st.session_state.entities)
+        st.metric("Avg φ-Score", f"{avg_phi:.4f}")
     
-    # Cross-layer φ-resonance detection
-    st.subheader("Cross-Layer φ-Resonance Analysis")
+    # Tabs
+    tab1, tab2, tab3 = st.tabs(["📊 Overview", "🕸️ Knowledge Graph", "🔬 Entity Analysis"])
     
-    # Calculate resonances
-    resonances = []
-    for i in range(min(20, len(df_quantum), len(df_info))):
-        q_score = df_quantum.iloc[i]['phi_score']
-        i_score = df_info.iloc[i]['phi_score']
+    with tab1:
+        st.header("Mining Overview")
         
-        ratio = q_score / (i_score + 1e-12)
-        deviation = abs(ratio - PHI) / PHI
-        strength = 1.0 - deviation
+        entities_list = list(st.session_state.entities.values())
+        phi_scores = [e.phi_score for e in entities_list]
         
-        resonances.append({
-            'quantum_id': df_quantum.iloc[i]['qubit_id'],
-            'info_id': df_info.iloc[i]['concept_id'],
-            'q_phi': q_score,
-            'i_phi': i_score,
-            'ratio': ratio,
-            'deviation': deviation,
-            'strength': strength
-        })
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig = px.histogram(
+                x=phi_scores,
+                nbins=30,
+                title='φ-Score Distribution',
+                labels={'x': 'φ-Score', 'y': 'Count'}
+            )
+            fig.update_traces(marker_color='gold')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            confidences = [e.confidence for e in entities_list]
+            fig2 = px.histogram(
+                x=confidences,
+                nbins=30,
+                title='Confidence Distribution',
+                labels={'x': 'Confidence', 'y': 'Count'}
+            )
+            fig2.update_traces(marker_color='#667eea')
+            st.plotly_chart(fig2, use_container_width=True)
+        
+        # Top entities
+        st.subheader("🌟 Top Entities by φ-Score")
+        
+        top = sorted(entities_list, key=lambda e: e.phi_score, reverse=True)[:10]
+        
+        for entity in top:
+            with st.expander(f"**{entity.source}** - φ: {entity.phi_score:.4f}"):
+                st.write(f"**Confidence:** {entity.confidence:.4f}")
+                st.write(f"**Entropy:** {entity.metadata.get('entropy', 0):.4f}")
+                
+                if entity.metadata.get('equations'):
+                    st.write("**Equations:**")
+                    for eq in entity.metadata['equations'][:3]:
+                        st.code(eq)
+                
+                st.text(entity.content[:300] + "...")
     
-    df_resonance = pd.DataFrame(resonances)
+    with tab2:
+        st.header("Knowledge Graph")
+        
+        # Build graph
+        G = nx.Graph()
+        
+        for eid, entity in st.session_state.entities.items():
+            G.add_node(eid, phi_score=entity.phi_score, source=entity.source)
+        
+        for res in st.session_state.phi_resonances:
+            G.add_edge(res['entity1'], res['entity2'], weight=1.0-res['deviation'])
+        
+        if len(G.nodes) > 0:
+            pos = nx.spring_layout(G, k=2, iterations=50)
+            
+            edge_trace = go.Scatter(
+                x=[], y=[],
+                line=dict(width=0.5, color='#ffd700'),
+                mode='lines',
+                opacity=0.3
+            )
+            
+            for edge in G.edges():
+                x0, y0 = pos[edge[0]]
+                x1, y1 = pos[edge[1]]
+                edge_trace['x'] += tuple([x0, x1, None])
+                edge_trace['y'] += tuple([y0, y1, None])
+            
+            node_trace = go.Scatter(
+                x=[], y=[],
+                text=[],
+                mode='markers',
+                marker=dict(
+                    size=[],
+                    color=[],
+                    colorscale='Viridis',
+                    showscale=True,
+                    line=dict(width=2, color='gold')
+                )
+            )
+            
+            for node in G.nodes():
+                x, y = pos[node]
+                node_trace['x'] += tuple([x])
+                node_trace['y'] += tuple([y])
+                
+                entity = st.session_state.entities[node]
+                node_trace['marker']['size'] += tuple([10 + entity.phi_score * 30])
+                node_trace['marker']['color'] += tuple([entity.phi_score])
+                node_trace['text'] += tuple([entity.source])
+            
+            fig = go.Figure(data=[edge_trace, node_trace])
+            fig.update_layout(
+                title='φ-Resonance Network',
+                showlegend=False,
+                hovermode='closest',
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                height=700
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Upload files to build graph")
     
-    # Resonance visualization
-    fig_resonance = px.scatter(
-        df_resonance,
-        x='q_phi',
-        y='i_phi',
-        color='strength',
-        size='strength',
-        hover_data=['quantum_id', 'info_id', 'ratio', 'deviation'],
-        title='Quantum-Information φ-Resonance Map',
-        color_continuous_scale='Viridis'
-    )
-    
-    # Add φ-line
-    max_phi = max(df_resonance['q_phi'].max(), df_resonance['i_phi'].max())
-    fig_resonance.add_trace(
-        go.Scatter(
-            x=[0, max_phi],
-            y=[0, max_phi/PHI],
-            mode='lines',
-            name='φ-Ratio Line',
-            line=dict(color='red', dash='dash')
-        )
-    )
-    
-    st.plotly_chart(fig_resonance, use_container_width=True)
-    
-    # Strong resonances
-    strong_resonances = df_resonance[df_resonance['strength'] > phi_threshold]
-    
-    st.info(f"**{len(strong_resonances)} strong φ-resonances detected** (strength > {phi_threshold})")
-    
-    if len(strong_resonances) > 0:
-        st.dataframe(
-            strong_resonances[['quantum_id', 'info_id', 'ratio', 'strength']].head(10),
-            use_container_width=True
-        )
-    
-    # IKF State calculation
-    st.subheader("Information-Kinetic Field (IKF) State")
-    
-    all_entities = pd.concat([
-        df_quantum[['phi_score']].assign(entropy=df_quantum['betti4'], layer='quantum'),
-        df_info[['phi_score', 'entropy']].assign(layer='information')
-    ])
-    
-    mean_entropy = all_entities['entropy'].mean()
-    entropy_var = all_entities['entropy'].var()
-    coherence = 1.0 / (1.0 + entropy_var)
-    
-    phi_scores = all_entities['phi_score'].values
-    phi_resonance = 0.0
-    for i in range(len(phi_scores) - 1):
-        ratio = phi_scores[i] / (phi_scores[i+1] + 1e-12)
-        deviation = abs(ratio - PHI) / PHI
-        phi_resonance += (1.0 - deviation) / len(phi_scores)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Mean Entropy", f"{mean_entropy:.4f}")
-    with col2:
-        st.metric("System Coherence", f"{coherence:.4f}")
-    with col3:
-        st.metric("φ-Resonance", f"{phi_resonance:.4f}")
-    
-    # Empirical validation summary
-    st.subheader("Empirical Validation Summary")
-    
-    validations = [
-        {
-            'phenomenon': 'CMB φ-Scaling',
-            'measured': '1.618034 nm',
-            'predicted': 'φ × 1 nm',
-            'confidence': 0.98,
-            'status': 'VALIDATED'
-        },
-        {
-            'phenomenon': 'DNA Helix Angle',
-            'measured': '34.3° ± 0.2°',
-            'predicted': '34.56°',
-            'confidence': 0.99,
-            'status': 'VALIDATED'
-        },
-        {
-            'phenomenon': 'T₂·SNL Constant',
-            'measured': f'{SNL_UNIVERSAL_K:.2e}',
-            'predicted': f'{SNL_UNIVERSAL_K:.2e}',
-            'confidence': 0.92,
-            'status': 'VALIDATED'
-        },
-        {
-            'phenomenon': 'Bell φ-Scaling',
-            'measured': 'Testing Q1 2025',
-            'predicted': 'Max at c',
-            'confidence': 0.90,
-            'status': 'UNDER_TEST'
-        }
-    ]
-    
-    df_validation = pd.DataFrame(validations)
-    
-    st.dataframe(df_validation, use_container_width=True, hide_index=True)
+    with tab3:
+        st.header("Entity Analysis")
+        
+        sort_by = st.selectbox("Sort by", ['φ-Score', 'Confidence', 'Entropy'])
+        
+        filtered = list(st.session_state.entities.values())
+        
+        if sort_by == 'φ-Score':
+            filtered.sort(key=lambda e: e.phi_score, reverse=True)
+        elif sort_by == 'Confidence':
+            filtered.sort(key=lambda e: e.confidence, reverse=True)
+        else:
+            filtered.sort(key=lambda e: e.metadata.get('entropy', 0), reverse=True)
+        
+        for entity in filtered[:max_display]:
+            st.markdown(f"""
+            <div class="entity-card">
+                <strong>{entity.source}</strong><br>
+                φ: {entity.phi_score:.4f} | Conf: {entity.confidence:.4f} | H: {entity.metadata.get('entropy', 0):.4f}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            with st.expander("Details"):
+                st.json(entity.metadata)
+                st.text(entity.content)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# FOOTER
-# ═══════════════════════════════════════════════════════════════════════════
+else:
+    st.info("""
+    ### 👋 Welcome!
+    
+    1. Upload JSON/TXT files in the sidebar
+    2. Configure detection parameters
+    3. Click "Start Mining"
+    4. Explore results in the tabs
+    """)
 
+# Footer
 st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: #666;'>
-    <p><strong>Unified φ-Field Processor v12.0</strong></p>
-    <p>Integrating SNLQC v11.0 + LLM v3.0 + IGS/IRGS Frameworks</p>
-    <p>φ = {PHI:.10f} | K = {SNL_UNIVERSAL_K:.2e} s·rad²·m⁻³</p>
-    <p><em>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</em></p>
+    <p><strong>φ-Field Advanced Knowledge Miner v12.0</strong></p>
+    <p>φ = {PHI:.10f}</p>
 </div>
 """, unsafe_allow_html=True)
+```
+
+---
+
+## **requirements.txt**
+```
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.17.0
+networkx>=3.1
